@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { parts, type StudyCard } from './data/chapters'
 
 const cover = `${import.meta.env.BASE_URL}covers/zato.jpg`
@@ -29,14 +29,19 @@ type Screen =
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
+  const partListScroll = useRef(0)
 
   return (
     <main className="app">
       {screen.name === 'home' && (
-        <Home onOpen={() => setScreen({ name: 'parts' })} />
+        <Home onOpen={() => {
+          partListScroll.current = 0
+          setScreen({ name: 'parts' })
+        }} />
       )}
       {screen.name === 'parts' && (
         <PartList
+          scrollMemory={partListScroll}
           onBack={() => setScreen({ name: 'home' })}
           onOpen={(part) => setScreen({ name: 'study', part, index: 0 })}
         />
@@ -73,10 +78,29 @@ function Home({ onOpen }: { onOpen: () => void }) {
   )
 }
 
-function PartList({ onBack, onOpen }: { onBack: () => void; onOpen: (part: number) => void }) {
+function PartList({
+  scrollMemory,
+  onBack,
+  onOpen,
+}: {
+  scrollMemory: RefObject<number>
+  onBack: () => void
+  onOpen: (part: number) => void
+}) {
+  const scroller = useRef<HTMLElement>(null)
   const total = parts.reduce((sum, part) => sum + part.length, 0)
+
+  useLayoutEffect(() => {
+    const element = scroller.current
+    if (!element) return
+    element.scrollTop = scrollMemory.current
+    return () => {
+      scrollMemory.current = element.scrollTop
+    }
+  }, [scrollMemory])
+
   return (
-    <section className="menu">
+    <section className="menu" ref={scroller}>
       <header className="words-top">
         <button className="text-button" onClick={onBack}>作品</button>
         <span className="count">{total}語</span>

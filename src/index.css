@@ -274,7 +274,8 @@ button:disabled { opacity: 0.32; cursor: default; }
 .round-main.is-open rect { fill: #143044; }
 
 .menu {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   padding:
