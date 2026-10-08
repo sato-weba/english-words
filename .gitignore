@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+sources/**
+!sources/.gitkeep
+decks/*.json
+dict/**
+!dict/.gitkeep
+Z.A.T.O_file/
