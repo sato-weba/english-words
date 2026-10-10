@@ -2,6 +2,27 @@ import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { parts, type StudyCard } from './data/chapters'
 
 const cover = `${import.meta.env.BASE_URL}covers/zato.jpg`
+const LAST_PART_KEY = 'english-words-last-part'
+
+function readLastPart(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_PART_KEY)
+    if (raw == null) return null
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < 0 || value >= parts.length) return null
+    return value
+  } catch {
+    return null
+  }
+}
+
+function writeLastPart(part: number) {
+  try {
+    localStorage.setItem(LAST_PART_KEY, String(part))
+  } catch {
+    // 保存できない環境では、表示だけ今回の画面内に残す
+  }
+}
 
 type Slot = {
   id: string
@@ -29,7 +50,14 @@ type Screen =
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
+  const [lastPart, setLastPart] = useState<number | null>(readLastPart)
   const partListScroll = useRef(0)
+
+  function openPart(part: number) {
+    writeLastPart(part)
+    setLastPart(part)
+    setScreen({ name: 'study', part, index: 0 })
+  }
 
   return (
     <main className="app">
@@ -42,16 +70,19 @@ export function App() {
       {screen.name === 'parts' && (
         <PartList
           scrollMemory={partListScroll}
+          lastPart={lastPart}
           onBack={() => setScreen({ name: 'home' })}
-          onOpen={(part) => setScreen({ name: 'study', part, index: 0 })}
+          onOpen={openPart}
         />
       )}
       {screen.name === 'study' && (
         <WordScreen
+          key={screen.part}
           cards={parts[screen.part]}
           index={screen.index}
           onBack={() => setScreen({ name: 'parts' })}
           onIndex={(index) => setScreen({ ...screen, index })}
+          onNextPart={screen.part < parts.length - 1 ? () => openPart(screen.part + 1) : undefined}
         />
       )}
     </main>
@@ -80,14 +111,16 @@ function Home({ onOpen }: { onOpen: () => void }) {
 
 function PartList({
   scrollMemory,
+  lastPart,
   onBack,
   onOpen,
 }: {
   scrollMemory: RefObject<number>
+  lastPart: number | null
   onBack: () => void
   onOpen: (part: number) => void
 }) {
-  const scroller = useRef<HTMLElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
   const total = parts.reduce((sum, part) => sum + part.length, 0)
 
   useLayoutEffect(() => {
@@ -99,23 +132,45 @@ function PartList({
     }
   }, [scrollMemory])
 
+  function showLastPart() {
+    scroller.current
+      ?.querySelector<HTMLElement>('[data-last="true"]')
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+
   return (
-    <section className="menu" ref={scroller}>
+    <section className="menu">
       <header className="words-top">
         <button className="text-button" onClick={onBack}>作品</button>
-        <span className="count">{total}語</span>
-      </header>
-      <h1 className="menu-title">Z.A.T.O.</h1>
-      <ul className="menu-list">
-        {parts.map((part, index) => (
-          <li key={index}>
-            <button className="menu-row" onClick={() => onOpen(index)}>
-              <span className="menu-name">Part {index + 1}</span>
-              <span className="menu-meta">{part.length}語</span>
+        <div className="menu-corner">
+          {lastPart != null && (
+            <button className="last-studied" onClick={showLastPart}>
+              前回 Part {lastPart + 1}
             </button>
-          </li>
-        ))}
-      </ul>
+          )}
+          <span className="count">{total}語</span>
+        </div>
+      </header>
+      <div className="menu-scroll" ref={scroller}>
+        <h1 className="menu-title">Z.A.T.O.</h1>
+        <ul className="menu-list">
+          {parts.map((part, index) => (
+            <li key={index}>
+              <button
+                className={`menu-row${lastPart === index ? ' is-last' : ''}`}
+                data-last={lastPart === index ? 'true' : undefined}
+                onClick={() => onOpen(index)}
+              >
+                <span className="menu-name">Part {index + 1}</span>
+                <span className="menu-meta">
+                  {lastPart === index && <span className="last-tag">前回</span>}
+                  {part.length}語
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }
@@ -125,11 +180,13 @@ function WordScreen({
   index,
   onBack,
   onIndex,
+  onNextPart,
 }: {
   cards: StudyCard[]
   index: number
   onBack: () => void
   onIndex: (index: number) => void
+  onNextPart?: () => void
 }) {
   const [revealed, setRevealed] = useState(false)
   const card = cards[index]
@@ -162,6 +219,9 @@ function WordScreen({
           ) : null}
         </div>
       </div>
+      {index === cards.length - 1 && onNextPart && (
+        <button className="next-part" onClick={onNextPart}>次のパートへ</button>
+      )}
       <div className="controls">
         <button
           className="round"
